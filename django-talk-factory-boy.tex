@@ -38,7 +38,6 @@
 \maketitle
 
 \begin{slide}
-
     \textcolor{blue}{\Large{What the problem?}}
 
     \begin{itemize}
@@ -59,7 +58,6 @@ class MyTests(TestCase):
         # ...
     # (and some tests, I hope!)
     \end{lstlisting}
-
 \end{slide}
 
 
@@ -95,44 +93,38 @@ class MyTests(TestCase):
     \end{itemize}
 \end{slide}
 
-\begin{slide}
 
+\begin{slide}
+    \textcolor{blue}{\Large{Factories to the rescue!}}
+    \begin{center}
+        \includegraphics[height=12cm]{factory}
+    \end{center}
+\end{slide}
+
+
+\begin{slide}
     \textcolor{blue}{\Large{Factory Boy}}
 
     \begin{itemize}
-        \item “a fixtures replacement based on thoughtbot’s `factory\_girl'.”
+        \item ``A fixtures replacement based on thoughtbot's `factory\_girl'.''
         \item \url{http://factoryboy.readthedocs.org/en/latest/}
     \end{itemize}
-
 \end{slide}
 
 
 
 \begin{slide}
-
     \textcolor{blue}{\Large{Example factory}}
 
     \begin{itemize}
-        \item Doesn't fit on one slide... here's the imports:
+        \item Creates auth.User instances
     \end{itemize}
-
-    \begin{lstlisting}
-# app/factories.py
-from datetime import datetime, timedelta
-from random import randint
-from django.template.defaultfilters import slugify
-from factory import DjangoModelFactory, lazy_attribute
-
-now = datetime.now
-    \end{lstlisting}
-
 \end{slide}
 
 
 
 
 \begin{slide}
-
     \begin{lstlisting}
 class User(DjangoModelFactory):
     class Meta:
@@ -143,9 +135,9 @@ class User(DjangoModelFactory):
     last_name = 'Johnson'
 
     @lazy_attribute
-    def username(o):
-        return slugify(o.first_name + '.' +
-                       o.last_name))
+    def username(self):
+        return slugify(self.first_name + '.' +
+                       self.last_name))
 
     @lazy_attribute
     def email(self):
@@ -160,6 +152,157 @@ class User(DjangoModelFactory):
         return self.date_joined + dt.timedelta(days=4))
     \end{lstlisting}
 
+\end{slide}
+
+
+\begin{slide}
+    \textcolor{blue}{\Large{Usage}}
+
+    \begin{lstlisting}
+class MyTests(TestCase):
+    def setUp(self):
+        # A single user, adam.johnson
+        self.user = factories.User()
+
+        # Another user, adam.smith
+        self.user2 = factories.User(last_name='Smith')
+
+        # A list of 10 users
+        # (actually get_or_create -> 10 x adam.johnson)
+        self.users = factories.User.create_batch(10)
+    \end{lstlisting}
+
+\end{slide}
+
+
+\begin{slide}
+    \textcolor{blue}{\Large{Adding fuzziness}}
+
+    \begin{center}
+        \includegraphics[height=12cm]{fuzzy}
+    \end{center}
+\end{slide}
+
+
+\begin{slide}
+    \textcolor{blue}{\Large{Adding fuzziness with faker}}
+
+    \begin{itemize}
+        \item A suite of functions for generating random test data
+        \item \url{http://www.joke2k.net/faker/}
+    \end{itemize}
+
+    \begin{lstlisting}
+import faker
+
+# separate to a factory boy Factory
+faker = faker.Factory.create()
+
+class User(DjangoModelFactory):
+    first_name = lazy(lambda o: faker.first_name())
+    last_name = lazy(lambda o: faker.last_name())
+    # ...
+    \end{lstlisting}
+\end{slide}
+
+
+\begin{slide}
+    \textcolor{blue}{\Large{Controlling the randomness}}
+
+    \begin{itemize}
+        \item Great for testing multiple paths
+        \item But need control - if a test fails due to the randomness, how do we re-run it?
+        \item For nose, install ``nose-randomize''. Prints random seed and lets you control it via ``--with-seed''.
+    \end{itemize}
+\end{slide}
+
+
+\begin{slide}
+    \textcolor{blue}{\Large{One-to-many relationships}}
+
+    \begin{itemize}
+        \item No built-in structure for navigating in particular
+        \item But flexible ``post\_generation'' hook lets you add code
+    \end{itemize}
+\end{slide}
+
+
+\begin{slide}
+    \begin{lstlisting}
+class Product(DjangoModelFactory):
+    class Meta:
+        model = 'app.Product'
+
+    @lazy_attribute
+    def name(self):
+        return "Book by " + faker.name()
+
+    @lazy_attribute
+    def price(self):
+        return Decimal(randint(5, 100))
+    \end{lstlisting}
+
+\end{slide}
+
+
+\begin{slide}
+    \begin{lstlisting}
+class ProductGroup(DjangoModelFactory):
+    class Meta:
+        model = 'app.ProductGroup'
+
+    @lazy_attribute
+    def name(self):
+        return "Products from " + faker.company()
+
+    @post_generation
+    def products(self, create, count, **kwargs):
+        if count is None:
+            count = 3
+
+        make_product = getattr(Product,
+            'create' if create else 'build')
+        products = [make_product(group=self)
+                    for i in range(count)]
+
+        if not create:
+            # Fiddle with django internals so
+            # self.product_set.all() works with build()
+            self._prefetched_objects_cache = \
+                {'product': products}
+    \end{lstlisting}
+\end{slide}
+
+
+\begin{slide}
+    \textcolor{blue}{\Large{Usage}}
+
+    \begin{lstlisting}
+class MyTests(TestCase):
+    def setUp(self):
+        # A group of 10
+        self.g1 = factories.ProductGroup(products=10)
+    \end{lstlisting}
+\end{slide}
+
+
+\begin{slide}
+    \textcolor{blue}{\Large{Problem solved?}}
+
+    \begin{itemize}
+        \item Helped us make terser, clearer tests
+        \item Lower maintenance
+        \item Useful also for populating local database with example data
+    \end{itemize}
+\end{slide}
+
+
+\begin{slide}
+    \textcolor{blue}{\Large{Thank you}}
+
+    \begin{itemize}
+        \item \url{me@adamj.eu}
+    \end{itemize}
 \end{slide}
 
 
